@@ -1,4 +1,4 @@
-tensorflow==2.12.0
+tensorflow==2.9.1
 pandas 
 gdown
 dvc
@@ -16,4 +16,7 @@ types-PyYAML
 scipy
 Flask
 Flask-Cors
+python-dotenv
+boto3
+dagshub
 -e .

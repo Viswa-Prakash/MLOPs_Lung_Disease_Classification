@@ -1,83 +1,96 @@
-from tensorflow.keras.applications import EfficientNetB0
-import tensorflow as tf
 from pathlib import Path
+import tensorflow as tf
 from cnnClassifier.entity.config_entity import PrepareBaseModelConfig
+from cnnClassifier import logger
 
 class PrepareBaseModel:
     def __init__(self, config: PrepareBaseModelConfig):
         self.config = config
-        self.model = None
-        self.full_model = None
 
-    def get_base_model(self):
+    def get_base_model(self) -> tf.keras.Model:
         """
-        Load the EfficientNetB0 base model without top layers.
+        Load a base model from tf.keras.applications with specified parameters.
         """
-        print("[INFO] Loading base EfficientNetB0 model...")
-        self.model = EfficientNetB0(
-            input_shape=tuple(self.config.params_image_size + [3]),
-            weights=self.config.params_weights,
-            include_top=self.config.params_include_top
+        logger.info(f"Loading base model: {self.config.base_model_name}")
+
+        base_model_class = getattr(tf.keras.applications, self.config.base_model_name)
+        model = base_model_class(
+            include_top=self.config.include_top,
+            weights=self.config.weights,
+            input_shape=tuple(self.config.input_shape)
         )
-        print("[INFO] Base model loaded successfully.")
 
-    @staticmethod
-    def _prepare_full_model(model, classes, dropout, freeze_all, freeze_till, learning_rate):
+        model.trainable = self.config.trainable
+        logger.info(f"Base model loaded with trainable = {model.trainable}")
+
+        # Save the base model to .h5
+        self._save_model_h5(self.config.base_model_path, model)
+        return model
+
+    def update_base_model(self, base_model: tf.keras.Model) -> tf.keras.Model:
         """
-        Add custom classification head and compile the model.
+        Add classification head to base model and compile with params.
         """
-        if freeze_all:
-            for layer in model.layers:
-                layer.trainable = False
-        elif freeze_till is not None and freeze_till > 0:
-            for layer in model.layers[:-freeze_till]:
-                layer.trainable = False
+        logger.info("Building updated model with classification head.")
 
-        x = tf.keras.layers.GlobalAveragePooling2D()(model.output)
-        x = tf.keras.layers.Dropout(dropout)(x)
-        output = tf.keras.layers.Dense(units=classes, activation="softmax")(x)
+        # Input layer
+        inputs = tf.keras.Input(shape=tuple(self.config.input_shape))
 
-        full_model = tf.keras.models.Model(inputs=model.input, outputs=output)
+        # Base model as feature extractor
+        x = base_model(inputs, training=False)
+        x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        x = tf.keras.layers.Dropout(self.config.dropout)(x)
 
+        # Output head
+        outputs = tf.keras.layers.Dense(
+            self.config.classes,
+            activation=self.config.activation,
+            kernel_regularizer=tf.keras.regularizers.l2(self.config.kernel_regularizer_l2)
+        )(x)
+
+        full_model = tf.keras.Model(inputs, outputs)
+
+        # Optimizer
+        optimizer_class = getattr(tf.keras.optimizers, self.config.optimizer)
+        optimizer = optimizer_class(learning_rate=self.config.learning_rate)
+
+        # Handle metrics
+        metrics = (
+            [self.config.metrics]
+            if isinstance(self.config.metrics, str)
+            else [str(m) for m in self.config.metrics]
+        )
+
+        # Compile model
         full_model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-            metrics=["accuracy"]
+            optimizer=optimizer,
+            loss=str(self.config.loss),
+            metrics=metrics
         )
 
-        print("[INFO] Full model compiled and ready for saving.")
+        logger.info("Updated model compiled successfully.")
+        full_model.summary()
+
+        # Save the updated model to .h5
+        self._save_model_h5(self.config.updated_base_model_path, full_model)
         return full_model
 
-    def update_base_model(self):
+    def _save_model_h5(self, path: Path, model: tf.keras.Model) -> None:
         """
-        Adds classification head to base model and saves the full model.
+        Save a model in .h5 format.
         """
-        if self.model is None:
-            raise ValueError("Base model has not been loaded. Call get_base_model() first.")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-        print("[INFO] Updating base model with classification head...")
-        self.full_model = self._prepare_full_model(
-            model=self.model,
-            classes=self.config.params_classes,
-            dropout=self.config.params_dropout,
-            freeze_all=True,
-            freeze_till=None,
-            learning_rate=self.config.params_learning_rate
-        )
+            if path.exists():
+                import shutil
+                if path.is_file():
+                    path.unlink()
+                else:
+                    shutil.rmtree(path)
 
-        print(f"[INFO] Saving full model to: {self.config.updated_base_model_path}")
-        self.save_model(path=self.config.updated_base_model_path, model=self.full_model)
-
-    @staticmethod
-    def save_model(path: Path, model: tf.keras.Model):
-        """
-        Saves the model in TensorFlow SavedModel format (folder-based).
-        Avoids JSON serialization issues with EagerTensors.
-        """
-        path = str(path)
-        # Ensure path is folder (not .keras/.h5 file)
-        if path.endswith(".keras") or path.endswith(".h5"):
-            path = path.replace(".keras", "").replace(".h5", "")
-
-        model.save(path)  # SavedModel format
-        print(f"[INFO] Model saved successfully at {path} (SavedModel format)")
+            model.save(str(path), save_format="h5", include_optimizer=False)
+            logger.info(f"Model saved successfully at: {path}")
+        except Exception as e:
+            logger.error(f"Error saving model at {path}: {e}")
+            raise e

@@ -1,11 +1,56 @@
+# Data Parameters
 AUGMENTATION: True
-IMAGE_SIZE: [224, 224]              
+IMAGE_HEIGHT: 224
+IMAGE_WIDTH: 224
 BATCH_SIZE: 32
-INCLUDE_TOP: False
-EPOCHS: 1
-FINE_TUNE_EPOCHS: 1
 CLASSES: 5
-WEIGHTS: imagenet
-LEARNING_RATE: 0.001 
-FINE_TUNE_LEARNING_RATE: 0.00001 
-DROPOUT: 0.5                 
+
+# Base Model (Frozen feature extractor only)
+BASE_MODEL:
+  NAME: EfficientNetB0
+  INCLUDE_TOP: False
+  WEIGHTS: imagenet
+  INPUT_SHAPE: [224, 224, 3]
+  TRAINABLE: False  # True if you want to start training from start
+
+# Updated Base Model (custom classification head)
+UPDATED_BASE_MODEL:
+  DROPOUT: 0.5
+  ACTIVATION: softmax  # Can be sigmoid for binary
+  KERNEL_REGULARIZER_L2: 0.0001  # Equivalent to 1e-4
+
+# Training Parameters
+TRAINING:
+  EPOCHS: 1
+  LEARNING_RATE: 0.001
+  LOSS: sparse_categorical_crossentropy
+  OPTIMIZER: Adam     # Adam, SGD, RMSprop
+  METRICS: accuracy   
+
+# Fine-tuning Parameters
+FINE_TUNE:
+  ENABLED: True
+  EPOCHS: 1
+  LEARNING_RATE: 0.00001
+  UNFREEZE_FROM_LAYER: 100  # Unfreeze layers after this index
+
+# Callback: EarlyStopping
+EARLY_STOPPING:
+  monitor: val_loss
+  patience: 5
+  restore_best_weights: True
+  verbose: 1
+
+# Callback: ReduceLROnPlateau
+REDUCE_LR_ON_PLATEAU:
+  monitor: val_loss
+  factor: 0.2
+  patience: 5
+  verbose: 1
+  min_lr: 0.000001
+
+# Callback: ModelCheckpoint
+MODEL_CHECKPOINT:
+  monitor: val_accuracy
+  save_best_only: True
+  verbose: 1
