@@ -1,0 +1,137 @@
+schema: '2.0'
+stages:
+  data_ingestion:
+    cmd: python src/cnnClassifier/pipeline/stage_01_data_ingestion.py
+    deps:
+    - path: config/config.yaml
+      hash: md5
+      md5: 743387c8d34de8c6734a5cbc4b5dd027
+      size: 1216
+    - path: src/cnnClassifier/pipeline/stage_01_data_ingestion.py
+      hash: md5
+      md5: 041ecfc7c6c92e18c74a94a75b656c7b
+      size: 912
+    outs:
+    - path: artifacts/data_ingestion
+      hash: md5
+      md5: 30de7697cd3bfdd4c0a341a40e8c35b5.dir
+      size: 2619206335
+      nfiles: 6055
+  prepare_base_model:
+    cmd: python src/cnnClassifier/pipeline/stage_02_prepare_base_model.py
+    deps:
+    - path: config/config.yaml
+      hash: md5
+      md5: 743387c8d34de8c6734a5cbc4b5dd027
+      size: 1216
+    - path: params.yaml
+      hash: md5
+      md5: adb9987c2e066dda532fd1872b2ada97
+      size: 1250
+    - path: src/cnnClassifier/pipeline/stage_02_prepare_base_model.py
+      hash: md5
+      md5: 8f2be25d0582050e18c4f12cccc56221
+      size: 1136
+    params:
+      params.yaml:
+        BASE_MODEL.INCLUDE_TOP: false
+        BASE_MODEL.INPUT_SHAPE:
+        - 224
+        - 224
+        - 3
+        BASE_MODEL.TRAINABLE: false
+        BASE_MODEL.WEIGHTS: imagenet
+        CLASSES: 5
+        IMAGE_HEIGHT: 224
+        IMAGE_WIDTH: 224
+        TRAINING.LEARNING_RATE: 0.001
+        TRAINING.LOSS: sparse_categorical_crossentropy
+        TRAINING.METRICS: accuracy
+        TRAINING.OPTIMIZER: Adam
+        UPDATED_BASE_MODEL.ACTIVATION: softmax
+        UPDATED_BASE_MODEL.DROPOUT: 0.5
+        UPDATED_BASE_MODEL.KERNEL_REGULARIZER_L2: 0.0001
+    outs:
+    - path: artifacts/prepare_base_model
+      hash: md5
+      md5: 263d142d8d40d530f10752fce2593ed2.dir
+      size: 33454800
+      nfiles: 2
+  training:
+    cmd: python src/cnnClassifier/pipeline/stage_03_model_trainer.py
+    deps:
+    - path: artifacts/data_ingestion
+      hash: md5
+      md5: 30de7697cd3bfdd4c0a341a40e8c35b5.dir
+      size: 2619206335
+      nfiles: 6055
+    - path: artifacts/prepare_base_model
+      hash: md5
+      md5: 8206d0814eda6ce174c40fbbe217dfce.dir
+      size: 33454784
+      nfiles: 2
+    - path: config/config.yaml
+      hash: md5
+      md5: 743387c8d34de8c6734a5cbc4b5dd027
+      size: 1216
+    - path: params.yaml
+      hash: md5
+      md5: adb9987c2e066dda532fd1872b2ada97
+      size: 1250
+    - path: src/cnnClassifier/pipeline/stage_03_model_trainer.py
+      hash: md5
+      md5: 6d4cdc88b9093181351b661be1cadc2f
+      size: 1062
+    params:
+      params.yaml:
+        AUGMENTATION: true
+        BATCH_SIZE: 32
+        CLASSES: 5
+        IMAGE_HEIGHT: 224
+        IMAGE_WIDTH: 224
+        TRAINING.EPOCHS: 1
+        TRAINING.LEARNING_RATE: 0.001
+        TRAINING.LOSS: sparse_categorical_crossentropy
+        TRAINING.METRICS: accuracy
+        TRAINING.OPTIMIZER: Adam
+    outs:
+    - path: artifacts/training
+      hash: md5
+      md5: 12f6f3d7d045e06a6cc867fa603203c2.dir
+      size: 16673288
+      nfiles: 1
+  evaluation:
+    cmd: python src/cnnClassifier/pipeline/stage_04_model_evaluation_mlflow.py
+    deps:
+    - path: artifacts/data_ingestion
+      hash: md5
+      md5: 30de7697cd3bfdd4c0a341a40e8c35b5.dir
+      size: 2619206335
+      nfiles: 6055
+    - path: artifacts/training
+      hash: md5
+      md5: 12f6f3d7d045e06a6cc867fa603203c2.dir
+      size: 16673288
+      nfiles: 1
+    - path: config/config.yaml
+      hash: md5
+      md5: 743387c8d34de8c6734a5cbc4b5dd027
+      size: 1216
+    - path: params.yaml
+      hash: md5
+      md5: adb9987c2e066dda532fd1872b2ada97
+      size: 1250
+    - path: src/cnnClassifier/pipeline/stage_04_model_evaluation_mlflow.py
+      hash: md5
+      md5: beb85446c4019f81202a6a40c0718c92
+      size: 1198
+    params:
+      params.yaml:
+        BATCH_SIZE: 32
+        IMAGE_HEIGHT: 224
+        IMAGE_WIDTH: 224
+    outs:
+    - path: scores.json
+      hash: md5
+      md5: 4c4f7d7e57eb82be601d038fb4894adb
+      size: 73

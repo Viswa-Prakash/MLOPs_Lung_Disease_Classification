@@ -16,10 +16,18 @@ stages:
     params:
       - IMAGE_HEIGHT
       - IMAGE_WIDTH
-      - INCLUDE_TOP
       - CLASSES
-      - WEIGHTS
-      - LEARNING_RATE
+      - BASE_MODEL.INCLUDE_TOP
+      - BASE_MODEL.WEIGHTS
+      - BASE_MODEL.TRAINABLE
+      - BASE_MODEL.INPUT_SHAPE
+      - UPDATED_BASE_MODEL.DROPOUT
+      - UPDATED_BASE_MODEL.ACTIVATION
+      - UPDATED_BASE_MODEL.KERNEL_REGULARIZER_L2
+      - TRAINING.LEARNING_RATE
+      - TRAINING.OPTIMIZER
+      - TRAINING.LOSS
+      - TRAINING.METRICS
     outs:
       - artifacts/prepare_base_model
 
@@ -34,11 +42,16 @@ stages:
     params:
       - IMAGE_HEIGHT
       - IMAGE_WIDTH
-      - EPOCHS
-      - BATCH_SIZE
+      - CLASSES
       - AUGMENTATION
+      - BATCH_SIZE
+      - TRAINING.EPOCHS
+      - TRAINING.LEARNING_RATE
+      - TRAINING.OPTIMIZER
+      - TRAINING.LOSS
+      - TRAINING.METRICS
     outs:
-      - artifacts/training/model.h5
+      - artifacts/training
 
   evaluation:
     cmd: python src/cnnClassifier/pipeline/stage_04_model_evaluation_mlflow.py
@@ -47,7 +60,7 @@ stages:
       - config/config.yaml
       - params.yaml
       - artifacts/data_ingestion
-      - artifacts/training/model.h5
+      - artifacts/training
     params:
       - IMAGE_HEIGHT
       - IMAGE_WIDTH

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lung Disease Classification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <style>
+    body { background-color: #eff2f9; }
+    .iupload h3 { color: #1b2d6b; font-size: 30px; font-weight: 700; }
+    .img-part, .res-part { height: 310px; }
+    .image-part { width: 300px; height: 300px; margin: auto; border: 1px solid #1b2d6b; }
+    .image-part img, #video { width: 100%; height: 100%; padding: 5px; }
+    .res-part { border: 1px solid #dedede; padding: 5px; overflow: auto; }
+    .jsonRes { margin-left: 30px; }
+    .btn-part { width: 325px; margin: auto; }
+    .btn-part button { margin: 0 5px; }
+    #loading { display: none; position: fixed; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.7); z-index: 9999999999; }
+    .loader { border: 8px solid #f3f3f3; border-top: 8px solid #363e75; border-radius: 50%; width: 60px; height: 60px; margin: 20% auto; animation: spin 2s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <section class="iupload">
+    <h3 class="text-center py-4">Lung Disease Classification</h3>
+    <div class="row">
+      <div class="img-part col-md-6">
+        <div class="image-part">
+          <video autoplay id="video"></video>
+          <img src="" id="photo" style="display: none;">
+          <canvas style="display:none;" id="canvas"></canvas>
+        </div>
+        <div class="btn-part">
+          <form id="upload-data">
+            <div class="input-group mt-3 row">
+              <button type="button" class="btn btn-primary col-md-5" id="uload">Upload</button>
+              <button type="button" class="btn btn-success col-md-5" id="send">Predict</button>
+            </div>
+            <input type="hidden" id="url" value="/predict"/>
+            <input name="upload" type="file" id="fileinput" style="position:absolute;top:-500px;"/>
+          </form>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h5 class="text-center mb-2">Prediction Results</h5>
+        <div class="res-part" id="prediction-box"></div>
+
+        <!-- Progress Bar -->
+        <div class="progress mt-3" style="height: 25px; display: none;" id="progress-container">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" style="width: 0%;" id="progress-bar">Preparing...</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="loading"><div class="loader"></div></div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+let base_data = "";
+
+function updateProgress(percent, text) {
+  $('#progress-container').show();
+  $('#progress-bar').css('width', percent + '%').text(text);
+}
+
+function resetProgress() {
+  setTimeout(() => {
+    $('#progress-container').hide();
+    $('#progress-bar').css('width', '0%').text('');
+  }, 1000);
+}
+
+function sendRequest(base64Data) {
+  const url = $("#url").val();
+  $("#loading").show();
+  updateProgress(40, 'Uploading Image...');
+
+  $.ajax({
+    url: url,
+    type: "POST",
+    contentType: "application/json",
+    data: JSON.stringify({ image: base64Data }),
+    success: function(res) {
+      updateProgress(90, 'Processing...');
+      $("#prediction-box").html("<pre>" + JSON.stringify(res[0], null, 2) + "</pre>");
+      updateProgress(100, 'Done');
+      resetProgress();
+      $("#loading").hide();
+    },
+    error: function(err) {
+      console.error("Prediction failed:", err);
+      $("#prediction-box").html("<pre>Prediction Failed. Check logs.</pre>");
+      updateProgress(100, 'Error');
+      resetProgress();
+      $("#loading").hide();
+    }
+  });
+}
+
+$(document).ready(function() {
+  $('#send').click(() => {
+    if (!base_data) {
+      alert("Please upload an image first!");
+      return;
+    }
+    sendRequest(base_data);
+  });
+
+  $('#uload').click(() => $('#fileinput').trigger('click'));
+
+  $('#fileinput').change(function() {
+    if (this.files && this.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const url = e.target.result;
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.getElementById("canvas");
+          canvas.width = this.width;
+          canvas.height = this.height;
+          canvas.getContext('2d').drawImage(this, 0, 0);
+          base_data = canvas.toDataURL('image/jpeg', 1.0).replace(/^data:image.+;base64,/, '');
+          console.log("Base64 image prepared.");
+        };
+        img.src = url;
+        $('#photo').attr('src', url).show();
+        $('#video').hide();
+      };
+      reader.readAsDataURL(this.files[0]);
+    }
+  });
+});
+</script>
+</body>
+</html>
