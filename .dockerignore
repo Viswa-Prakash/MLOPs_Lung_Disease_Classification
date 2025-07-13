@@ -4,7 +4,6 @@ logs
 env
 venv
 LICENSE
-README.md
 cnnClassifier.egg-info
 template.py
 .gitignore
